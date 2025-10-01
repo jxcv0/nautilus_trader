@@ -13,9 +13,16 @@
 //  limitations under the License.
 // -------------------------------------------------------------------------------------------------
 
-//! Shared primitives and utilities for the Bybit adapter.
+//! OANDA adapter constants including base URLs and the venue identifier.
 
-pub mod consts;
-pub mod credential;
-pub mod enums;
-pub mod urls;
+use std::sync::LazyLock;
+
+use nautilus_model::identifiers::Venue;
+use ustr::Ustr;
+
+pub const OANDA: &str = "OANDA";
+
+pub const OANDA_HTTP_URL: &str = "https://api-fxtrade.oanda.com";
+pub const OANDA_HTTP_PRACTICE_URL: &str = "https://api-fxpractice.oanda.com";
+
+pub static OANDA_VENUE: LazyLock<Venue> = LazyLock::new(|| Venue::new(Ustr::from(OANDA)));

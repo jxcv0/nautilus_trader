@@ -25,7 +25,10 @@ use std::{
 };
 
 use super::error::OandaHttpError;
-use crate::common::{credential::Credential, enums::OandaEnvironment, urls::oanda_http_base_url};
+use crate::common::{
+    consts::OANDA_HTTP_URL, credential::Credential, enums::OandaEnvironment,
+    urls::oanda_http_base_url,
+};
 use nautilus_core::consts::NAUTILUS_USER_AGENT;
 use nautilus_network::{
     http::HttpClient,
@@ -267,7 +270,7 @@ mod tests {
         assert!(client.is_ok());
 
         let client = client.unwrap();
-        assert_eq!(client.base_url(), "https://api-fxtrade.oanda.com");
+        assert_eq!(client.base_url(), OANDA_HTTP_URL);
         assert!(client.credential().is_none());
     }
 
@@ -275,7 +278,7 @@ mod tests {
     fn test_client_with_credentials() {
         let client = OandaHttpClient::with_credentials(
             "test_token".to_string(),
-            Some("https://api-fxpractice.oanda.com".to_string()),
+            None,
             Some(60),
             None,
             None,

@@ -14,13 +14,12 @@
 // -------------------------------------------------------------------------------------------------
 
 //! [NautilusTrader](http://nautilustrader.io) adapter for the
-//! [Bybit](https://www.bybit.com/) cryptocurrency exchange.
+//! [OANDA](https://www.oanda.com/) foreign exchange venue.
 //!
-//! The `nautilus-bybit` crate provides client bindings (HTTP & WebSocket), data
-//! models, and helper utilities that wrap the official **Bybit v5 API**.
+//! The `nautilus-oanda` crate provides client bindings (HTTP & streaming), data
+//! models, and helper utilities that wrap the official **OANDA v20 API**.
 //!
-//! The official Bybit API reference can be found at <https://bybit-exchange.github.io/docs/v5/intro>.
-//! All public links inside this crate reference the English version of the documentation.
+//! The official OANDA API reference can be found at <https://developer.oanda.com/>.
 //!
 //! # Platform
 //!
@@ -43,7 +42,9 @@
 //!
 //! # Documentation
 //!
-//! See <https://docs.rs/nautilus-bybit> for the latest API documentation.
+//! See <https://docs.rs/nautilus-oanda> for the latest API documentation.
 
 pub mod common;
+pub mod config;
+pub mod data;
 pub mod http;

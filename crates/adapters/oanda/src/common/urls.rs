@@ -17,10 +17,12 @@
 
 use crate::common::enums::OandaEnvironment;
 
+use crate::common::consts::{OANDA_HTTP_PRACTICE_URL, OANDA_HTTP_URL};
+
 #[must_use]
 pub const fn oanda_http_base_url(environment: OandaEnvironment) -> &'static str {
     match environment {
-        OandaEnvironment::FxTradePractice => "https://api-fxpractice.oanda.com",
-        OandaEnvironment::FxTrade => "https://api-fxtrade.oanda.com",
+        OandaEnvironment::FxTradePractice => OANDA_HTTP_PRACTICE_URL,
+        OandaEnvironment::FxTrade => OANDA_HTTP_URL,
     }
 }
