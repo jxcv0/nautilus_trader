@@ -66,6 +66,11 @@ impl Debug for OandaHttpInnerClient {
 }
 
 impl OandaHttpInnerClient {
+    /// Creates a new [`OandaHttpInnerClient`] using the default OANDA HTTP URL.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the retry manager cannot be created.
     pub fn new(
         base_url: Option<String>,
         timeout_secs: Option<u64>,
@@ -108,6 +113,50 @@ impl OandaHttpInnerClient {
         })
     }
 
+    /// Creates a new [`OandaHttpInnerClient`] configured with credentials.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the retry manager cannot be created.
+    pub fn with_credentials(
+        bearer_token: String,
+        base_url: Option<String>,
+        timeout_secs: Option<u64>,
+        max_retries: Option<u32>,
+        retry_delay_ms: Option<u64>,
+        retry_delay_max_ms: Option<u64>,
+    ) -> Result<Self, OandaHttpError> {
+        let retry_config = RetryConfig {
+            max_retries: max_retries.unwrap_or(3),
+            initial_delay_ms: retry_delay_ms.unwrap_or(1000),
+            max_delay_ms: retry_delay_max_ms.unwrap_or(10_000),
+            backoff_factor: 2.0,
+            jitter_ms: 1000,
+            operation_timeout_ms: Some(60_000),
+            immediate_first: false,
+            max_elapsed_ms: Some(180_000),
+        };
+
+        let retry_manager = RetryManager::new(retry_config).map_err(|e| {
+            OandaHttpError::NetworkError(format!("Failed to create retry manager: {e}"))
+        })?;
+
+        Ok(Self {
+            base_url: base_url
+                .unwrap_or_else(|| oanda_http_base_url(OandaEnvironment::FxTrade).to_string()),
+            client: HttpClient::new(
+                Self::default_headers(),
+                vec![],
+                vec![],
+                Some(*OANDA_REST_QUOTA),
+                timeout_secs,
+            ),
+            credential: Some(Credential::new(bearer_token)),
+            retry_manager,
+            cancellation_token: CancellationToken::new(),
+        })
+    }
+
     /// Returns the base URL used for requests.
     #[must_use]
     pub fn base_url(&self) -> &str {
@@ -130,7 +179,7 @@ impl OandaHttpInnerClient {
 ////////////////////////////////////////////////////////////////////////////////
 
 /// Provides the HTTP client for connecting to the [OANDA](https://www.oanda.com/) V20 REST API
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 #[cfg_attr(
     feature = "python",
     pyo3::pyclass(module = "nautilus_trader.core.nautilus_pyo3.adapters")
@@ -147,7 +196,11 @@ impl Default for OandaHttpClient {
 }
 
 impl OandaHttpClient {
-    /// Creates a new [`OandaHttpClient`] using the default Oanda HTTP URL.
+    /// Creates a new [`OandaHttpClient`] using the default OANDA HTTP URL.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the retry manager cannot be created.
     pub fn new(
         base_url: Option<String>,
         timeout_secs: Option<u64>,
@@ -157,6 +210,26 @@ impl OandaHttpClient {
     ) -> Result<Self, OandaHttpError> {
         Ok(Self {
             inner: Arc::new(OandaHttpInnerClient::new(
+                base_url,
+                timeout_secs,
+                max_retries,
+                retry_delay_ms,
+                retry_delay_max_ms,
+            )?),
+        })
+    }
+
+    pub fn with_credentials(
+        bearer_token: String,
+        base_url: Option<String>,
+        timeout_secs: Option<u64>,
+        max_retries: Option<u32>,
+        retry_delay_ms: Option<u64>,
+        retry_delay_max_ms: Option<u64>,
+    ) -> Result<Self, OandaHttpError> {
+        Ok(Self {
+            inner: Arc::new(OandaHttpInnerClient::with_credentials(
+                bearer_token,
                 base_url,
                 timeout_secs,
                 max_retries,
@@ -196,5 +269,21 @@ mod tests {
         let client = client.unwrap();
         assert_eq!(client.base_url(), "https://api-fxtrade.oanda.com");
         assert!(client.credential().is_none());
+    }
+
+    #[rstest]
+    fn test_client_with_credentials() {
+        let client = OandaHttpClient::with_credentials(
+            "test_token".to_string(),
+            Some("https://api-fxpractice.oanda.com".to_string()),
+            Some(60),
+            None,
+            None,
+            None,
+        );
+        assert!(client.is_ok());
+
+        let client = client.unwrap();
+        assert!(client.credential().is_some());
     }
 }
