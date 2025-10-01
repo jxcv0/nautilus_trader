@@ -27,8 +27,13 @@ use std::{
 use super::error::OandaHttpError;
 use crate::common::{credential::Credential, enums::OandaEnvironment, urls::oanda_http_base_url};
 use nautilus_core::consts::NAUTILUS_USER_AGENT;
-use nautilus_network::{http::HttpClient, ratelimiter::quota::Quota};
+use nautilus_network::{
+    http::HttpClient,
+    ratelimiter::quota::Quota,
+    retry::{RetryConfig, RetryManager},
+};
 use reqwest::header::USER_AGENT;
+use tokio_util::sync::CancellationToken;
 
 /// OANDA implements a rate limit of 120 requests per second against requesting IP address.
 /// Excess requests receive HTTP 429 error.
@@ -40,11 +45,14 @@ pub struct OandaHttpInnerClient {
     base_url: String,
     client: HttpClient,
     credential: Option<Credential>,
+    retry_manager: RetryManager<OandaHttpError>,
+    cancellation_token: CancellationToken,
 }
 
 impl Default for OandaHttpInnerClient {
     fn default() -> Self {
-        Self::new(None, None).expect("Failed to create default OandaHttpInnerClient")
+        Self::new(None, Some(60), None, None, None)
+            .expect("Failed to create default OandaHttpInnerClient")
     }
 }
 
@@ -61,7 +69,25 @@ impl OandaHttpInnerClient {
     pub fn new(
         base_url: Option<String>,
         timeout_secs: Option<u64>,
+        max_retries: Option<u32>,
+        retry_delay_ms: Option<u64>,
+        retry_delay_max_ms: Option<u64>,
     ) -> Result<Self, OandaHttpError> {
+        let retry_config = RetryConfig {
+            max_retries: max_retries.unwrap_or(3),
+            initial_delay_ms: retry_delay_ms.unwrap_or(1000),
+            max_delay_ms: retry_delay_max_ms.unwrap_or(10_000),
+            backoff_factor: 2.0,
+            jitter_ms: 1000,
+            operation_timeout_ms: Some(60_000),
+            immediate_first: false,
+            max_elapsed_ms: Some(180_000),
+        };
+
+        let retry_manager = RetryManager::new(retry_config).map_err(|e| {
+            OandaHttpError::NetworkError(format!("Failed to create retry manager: {e}"))
+        })?;
+
         let base_url =
             base_url.unwrap_or_else(|| oanda_http_base_url(OandaEnvironment::FxTrade).to_string());
 
@@ -72,10 +98,13 @@ impl OandaHttpInnerClient {
             Some(*OANDA_REST_QUOTA),
             timeout_secs,
         );
+
         Ok(Self {
             base_url,
             client,
             credential: None,
+            retry_manager,
+            cancellation_token: CancellationToken::new(),
         })
     }
 
@@ -112,19 +141,28 @@ pub struct OandaHttpClient {
 
 impl Default for OandaHttpClient {
     fn default() -> Self {
-        Self::new(None, Some(60)).expect("Failed to create default OandaHttpClient")
+        Self::new(None, Some(60), None, None, None)
+            .expect("Failed to create default OandaHttpClient")
     }
 }
 
 impl OandaHttpClient {
     /// Creates a new [`OandaHttpClient`] using the default Oanda HTTP URL.
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         base_url: Option<String>,
         timeout_secs: Option<u64>,
+        max_retries: Option<u32>,
+        retry_delay_ms: Option<u64>,
+        retry_delay_max_ms: Option<u64>,
     ) -> Result<Self, OandaHttpError> {
         Ok(Self {
-            inner: Arc::new(OandaHttpInnerClient::new(base_url, timeout_secs)?),
+            inner: Arc::new(OandaHttpInnerClient::new(
+                base_url,
+                timeout_secs,
+                max_retries,
+                retry_delay_ms,
+                retry_delay_max_ms,
+            )?),
         })
     }
 
@@ -152,7 +190,7 @@ mod tests {
 
     #[rstest]
     fn test_client_creation() {
-        let client = OandaHttpClient::new(None, Some(60));
+        let client = OandaHttpClient::new(None, Some(60), None, None, None);
         assert!(client.is_ok());
 
         let client = client.unwrap();
