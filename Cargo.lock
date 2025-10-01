@@ -5133,6 +5133,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "nautilus-oanda"
+version = "0.51.0"
+dependencies = [
+ "nautilus-common",
+ "nautilus-core",
+ "nautilus-data",
+ "nautilus-execution",
+ "nautilus-model",
+ "nautilus-network",
+ "reqwest",
+ "rust_decimal",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "zeroize",
+]
+
+[[package]]
 name = "nautilus-okx"
 version = "0.51.0"
 dependencies = [

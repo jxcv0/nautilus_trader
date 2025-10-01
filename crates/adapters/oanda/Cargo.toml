@@ -1,0 +1,34 @@
+[package]
+name = "nautilus-oanda"
+readme = "README.md"
+publish = false  # Do not publish to crates.io for now
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description.workspace = true
+categories.workspace = true
+keywords.workspace = true
+documentation.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+name = "nautilus_oanda"
+crate-type = ["rlib", "cdylib"]
+
+[dependencies]
+nautilus-common = { workspace = true }
+nautilus-core = { workspace = true }
+nautilus-data = { workspace = true }
+nautilus-execution = { workspace = true }
+nautilus-model = { workspace = true }
+nautilus-network = { workspace = true }
+
+reqwest = { workspace = true }
+rust_decimal = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+zeroize = { workspace = true }
+thiserror = { workspace = true }
