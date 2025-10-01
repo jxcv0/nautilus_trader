@@ -17,7 +17,12 @@
 //!
 //! OANDA V20 api reference <https://developer.oanda.com/rest-live-v20/development-guide/>
 
-use std::{collections::HashMap, fmt::Debug, num::NonZeroU32, sync::LazyLock};
+use std::{
+    collections::HashMap,
+    fmt::Debug,
+    num::NonZeroU32,
+    sync::{Arc, LazyLock},
+};
 
 use super::error::OandaHttpError;
 use crate::common::{credential::Credential, enums::OandaEnvironment, urls::oanda_http_base_url};
@@ -30,7 +35,7 @@ use reqwest::header::USER_AGENT;
 pub static OANDA_REST_QUOTA: LazyLock<Quota> =
     LazyLock::new(|| Quota::per_second(NonZeroU32::new(120).expect("120 is a valid non-zero u32")));
 
-/// Inner HTTP client implementation containing HTTP logic
+/// Inner HTTP client implementation containing HTTP logic.
 pub struct OandaHttpInnerClient {
     base_url: String,
     client: HttpClient,
@@ -74,7 +79,84 @@ impl OandaHttpInnerClient {
         })
     }
 
+    /// Returns the base URL used for requests.
+    #[must_use]
+    pub fn base_url(&self) -> &str {
+        &self.base_url
+    }
+
+    /// Returns the API credential if configured.
+    #[must_use]
+    pub fn credential(&self) -> Option<&Credential> {
+        self.credential.as_ref()
+    }
+
     fn default_headers() -> HashMap<String, String> {
         HashMap::from([(USER_AGENT.to_string(), NAUTILUS_USER_AGENT.to_string())])
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Outer Client
+////////////////////////////////////////////////////////////////////////////////
+
+/// Provides the HTTP client for connecting to the [OANDA](https://www.oanda.com/) V20 REST API
+#[derive(Clone)]
+#[cfg_attr(
+    feature = "python",
+    pyo3::pyclass(module = "nautilus_trader.core.nautilus_pyo3.adapters")
+)]
+pub struct OandaHttpClient {
+    pub(crate) inner: Arc<OandaHttpInnerClient>,
+}
+
+impl Default for OandaHttpClient {
+    fn default() -> Self {
+        Self::new(None, Some(60)).expect("Failed to create default OandaHttpClient")
+    }
+}
+
+impl OandaHttpClient {
+    /// Creates a new [`OandaHttpClient`] using the default Oanda HTTP URL.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        base_url: Option<String>,
+        timeout_secs: Option<u64>,
+    ) -> Result<Self, OandaHttpError> {
+        Ok(Self {
+            inner: Arc::new(OandaHttpInnerClient::new(base_url, timeout_secs)?),
+        })
+    }
+
+    /// Returns the base URL used for requests.
+    pub fn base_url(&self) -> &str {
+        self.inner.base_url()
+    }
+
+    /// Returns the API credential if configured.
+    #[must_use]
+    pub fn credential(&self) -> Option<&Credential> {
+        self.inner.credential()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Tests
+////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use rstest::rstest;
+
+    use super::*;
+
+    #[rstest]
+    fn test_client_creation() {
+        let client = OandaHttpClient::new(None, Some(60));
+        assert!(client.is_ok());
+
+        let client = client.unwrap();
+        assert_eq!(client.base_url(), "https://api-fxtrade.oanda.com");
+        assert!(client.credential().is_none());
     }
 }
