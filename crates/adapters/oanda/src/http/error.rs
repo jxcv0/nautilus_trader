@@ -21,8 +21,18 @@ use thiserror::Error;
 /// A typed error enumeration for the OANDA HTTP client.
 #[derive(Debug, Clone, Error)]
 pub enum OandaHttpError {
+    /// Error variant when credentials are missing but the request is authenticated.
+    #[error("Missing credentials for authenticated request")]
+    MissingCredentials,
+    /// Generic network error (for retries, cancellations, etc).
     #[error("Network error: {0}")]
     NetworkError(String),
+    /// Failure during JSON serialization/deserialization.
+    #[error("JSON error: {0}")]
+    JsonError(String),
+    /// Any unknown HTTP status or unexpected response from OANDA.
+    #[error("Unexpected HTTP status code {status}: {body}")]
+    UnexpectedStatus { status: u16, body: String },
 }
 
 impl From<HttpClientError> for OandaHttpError {
