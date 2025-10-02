@@ -25,9 +25,12 @@ use std::{
 };
 
 use super::error::OandaHttpError;
-use crate::common::{
-    consts::OANDA_HTTP_URL, credential::Credential, enums::OandaEnvironment,
-    urls::oanda_http_base_url,
+use crate::{
+    common::{
+        consts::OANDA_HTTP_URL, credential::Credential, enums::OandaEnvironment,
+        urls::oanda_http_base_url,
+    },
+    http::models::OandaInstrument,
 };
 use nautilus_core::consts::NAUTILUS_USER_AGENT;
 use nautilus_network::{
@@ -174,6 +177,15 @@ impl OandaHttpInnerClient {
 
     fn default_headers() -> HashMap<String, String> {
         HashMap::from([(USER_AGENT.to_string(), NAUTILUS_USER_AGENT.to_string())])
+    }
+
+    /// Get the list of tradeable instruments for a given account
+    /// TODO: Where do we store the account?
+    pub async fn http_get_instruments(
+        &self,
+        account_id: &str,
+    ) -> Result<Vec<OandaInstrument>, OandaHttpError> {
+        todo!()
     }
 }
 

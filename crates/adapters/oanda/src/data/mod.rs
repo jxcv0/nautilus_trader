@@ -43,7 +43,7 @@ use nautilus_core::{
 use nautilus_data::client::DataClient;
 use nautilus_model::{
     identifiers::{ClientId, InstrumentId, Venue},
-    instruments::{InstrumentAny, Instrument},
+    instruments::{Instrument, InstrumentAny},
 };
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
