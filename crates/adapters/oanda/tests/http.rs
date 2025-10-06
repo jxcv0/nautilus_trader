@@ -102,3 +102,29 @@ async fn http_get_instruments() {
         Decimal::new(100000, 5)
     );
 }
+
+#[rstest]
+#[tokio::test]
+async fn http_get_instrument() {
+    let mock_server = start_mock_server("123").await;
+
+    let client = OandaHttpClient::new(Some(mock_server.uri()), None, None, None, None).unwrap();
+    let aud_nzd = client
+        .http_get_instrument("123", "AUD_NZD")
+        .await
+        .expect("http_get_instrument failed")
+        .unwrap();
+
+    // now check fields
+    assert_eq!(aud_nzd.name, OandaInstrumentName::AudNzd);
+    assert_eq!(aud_nzd.r#type, OandaInstrumentType::Currency);
+    assert_eq!(aud_nzd.display_name, "AUD/NZD");
+    assert_eq!(aud_nzd.pip_location, -4);
+    assert_eq!(aud_nzd.display_precision, 5);
+    assert_eq!(aud_nzd.trade_units_precision, 0);
+    assert_eq!(aud_nzd.minimum_trade_size, Decimal::new(1, 0));
+    assert_eq!(
+        aud_nzd.maximum_trailing_stop_distance,
+        Decimal::new(100000, 5)
+    );
+}

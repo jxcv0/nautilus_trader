@@ -189,6 +189,18 @@ impl OandaHttpInnerClient {
         Ok(res.instruments)
     }
 
+    /// Get a single tradeable instrument for a given account
+    pub async fn http_get_instrument(
+        &self,
+        account_id: &str,
+        symbol: &str,
+    ) -> Result<Option<OandaInstrument>, OandaHttpError> {
+        let path = &format!("/v3/accounts/{account_id}/instruments?instruments={symbol}");
+        let res: OandaInstrumentsResponse =
+            self.send_request(Method::GET, path, None, false).await?;
+        Ok(res.instruments.into_iter().next())
+    }
+
     fn bearer_auth_headers(&self) -> Option<HashMap<String, String>> {
         let credential = self.credential.as_ref();
         credential.map(|credential| {
@@ -346,6 +358,14 @@ impl OandaHttpClient {
         account_id: &str,
     ) -> Result<Vec<OandaInstrument>, OandaHttpError> {
         self.inner.http_get_instruments(account_id).await
+    }
+
+    pub async fn http_get_instrument(
+        &self,
+        account_id: &str,
+        symbol: &str,
+    ) -> Result<Option<OandaInstrument>, OandaHttpError> {
+        self.inner.http_get_instrument(account_id, symbol).await
     }
 }
 
