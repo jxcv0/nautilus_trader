@@ -26,11 +26,8 @@ use std::{
 
 use super::error::OandaHttpError;
 use crate::{
-    common::{
-        consts::OANDA_HTTP_URL, credential::Credential, enums::OandaEnvironment,
-        urls::oanda_http_base_url,
-    },
-    http::models::OandaInstrument,
+    common::{credential::Credential, enums::OandaEnvironment, urls::oanda_http_base_url},
+    http::models::{OandaInstrument, OandaInstrumentsResponse},
 };
 use nautilus_core::consts::NAUTILUS_USER_AGENT;
 use nautilus_network::{
@@ -38,7 +35,8 @@ use nautilus_network::{
     ratelimiter::quota::Quota,
     retry::{RetryConfig, RetryManager},
 };
-use reqwest::header::USER_AGENT;
+use reqwest::{Method, header::USER_AGENT};
+use serde::de::DeserializeOwned;
 use tokio_util::sync::CancellationToken;
 
 /// OANDA implements a rate limit of 120 requests per second against requesting IP address.
@@ -185,7 +183,85 @@ impl OandaHttpInnerClient {
         &self,
         account_id: &str,
     ) -> Result<Vec<OandaInstrument>, OandaHttpError> {
-        todo!()
+        let path = format!("/v3/accounts/{account_id}/instruments");
+        let res: OandaInstrumentsResponse =
+            self.send_request(Method::GET, &path, None, false).await?;
+        Ok(res.instruments)
+    }
+
+    fn bearer_auth_headers(&self) -> Option<HashMap<String, String>> {
+        let credential = self.credential.as_ref();
+        credential.map(|credential| {
+            HashMap::from([("bearer auth".to_string(), credential.bearer_token())])
+        })
+    }
+
+    async fn send_request<T: DeserializeOwned>(
+        &self,
+        method: Method,
+        endpoint: &str,
+        body: Option<Vec<u8>>,
+        authenticate: bool,
+    ) -> Result<T, OandaHttpError> {
+        if authenticate && self.credential.is_none() {
+            return Err(OandaHttpError::MissingCredentials);
+        }
+
+        let endpoint = endpoint.to_string();
+        let url = format!("{}{endpoint}", self.base_url);
+        let method_clone = method.clone();
+        let body_clone = body.clone();
+
+        let operation = || {
+            let url = url.clone();
+            let method = method_clone.clone();
+            let body = body_clone.clone();
+
+            async move {
+                let headers = if authenticate {
+                    self.bearer_auth_headers()
+                } else {
+                    None
+                };
+
+                let resp = self
+                    .client
+                    .request(method.clone(), url, headers, body, None, None)
+                    .await?;
+
+                if resp.status.is_success() {
+                    serde_json::from_slice::<T>(&resp.body).map_err(Into::into)
+                } else {
+                    Err(OandaHttpError::NetworkError("TODO".to_string()))
+                }
+            }
+        };
+
+        // Retry strategy:
+        //
+        // 1. Network errors: always retry (transient connection issues)
+        // 2. HTTP 5xx/429: server errors and rate limiting should be retried
+        //
+        // TODO: Errors that should not be retried (invalid requests/account balance)
+        let should_retry = |error: &OandaHttpError| -> bool {
+            match error {
+                OandaHttpError::NetworkError(_) => true,
+                OandaHttpError::UnexpectedStatus { status, .. } => *status >= 500 || *status == 429,
+                _ => false,
+            }
+        };
+
+        let create_error = |msg: String| -> OandaHttpError { OandaHttpError::NetworkError(msg) };
+
+        self.retry_manager
+            .execute_with_retry_with_cancel(
+                endpoint.as_str(),
+                operation,
+                should_retry,
+                create_error,
+                &self.cancellation_token,
+            )
+            .await
     }
 }
 
@@ -264,6 +340,13 @@ impl OandaHttpClient {
     pub fn credential(&self) -> Option<&Credential> {
         self.inner.credential()
     }
+
+    pub async fn http_get_instruments(
+        &self,
+        account_id: &str,
+    ) -> Result<Vec<OandaInstrument>, OandaHttpError> {
+        self.inner.http_get_instruments(account_id).await
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -272,9 +355,10 @@ impl OandaHttpClient {
 
 #[cfg(test)]
 mod tests {
-    use rstest::rstest;
-
     use super::*;
+    use crate::common::consts::OANDA_HTTP_URL;
+
+    use rstest::rstest;
 
     #[rstest]
     fn test_client_creation() {

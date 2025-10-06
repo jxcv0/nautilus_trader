@@ -267,9 +267,9 @@ pub struct OandaInstrument {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OandaInstrumentsResponse {
-    instruments: Vec<OandaInstrument>,
+    pub instruments: Vec<OandaInstrument>,
     #[serde(rename = "lastTransactionID")]
-    last_transaction_id: String,
+    pub last_transaction_id: String,
 }
 
 #[cfg(test)]

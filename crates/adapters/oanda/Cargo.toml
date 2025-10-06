@@ -82,3 +82,4 @@ rstest = { workspace = true }
 tracing-test = { workspace = true }
 url = { workspace = true }
 axum = { workspace = true }
+wiremock = { workspace = true }

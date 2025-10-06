@@ -40,3 +40,11 @@ impl From<HttpClientError> for OandaHttpError {
         Self::NetworkError(error.to_string())
     }
 }
+
+// Allow use of the `?` operator on `serde_json` results inside the HTTP
+// client implementation by converting them into our typed error.
+impl From<serde_json::Error> for OandaHttpError {
+    fn from(error: serde_json::Error) -> Self {
+        Self::JsonError(error.to_string())
+    }
+}
